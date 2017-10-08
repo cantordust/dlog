@@ -150,9 +150,9 @@ int main()
 					auto future3 = std::async(std::launch::async, uint_void);
 
 					dlog() << "Multiple futures:"
-						   << "\n\tfuture1: " << future1
-						   << "\n\tfuture2: " << future2
-						   << "\n\tfuture3: " << future3;
+						   << "\n\tfuture 1: " << future1
+						   << "\n\tfuture 2: " << future2
+						   << "\n\tfuture 3: " << future3;
 				}
 			}
 		});
@@ -199,7 +199,7 @@ int main()
 
 			auto future3 = std::async(std::launch::async, [&]{ dlog() << "#### Lambdas rock " << ++rock << " times!"; });
 
-			sptr<std::packaged_task<uint()>> pt(std::make_shared<std::packaged_task<uint()>>(uint_void));
+			sp<std::packaged_task<uint()>> pt(std::make_shared<std::packaged_task<uint()>>(uint_void));
 			auto future4 = pt->get_future();
 			std::thread([spt = pt]
 			{
@@ -207,7 +207,7 @@ int main()
 				(*spt)();
 			}).detach();
 
-			sptr<std::promise<uint>> pm(std::make_shared<std::promise<uint>>());
+			sp<std::promise<uint>> pm(std::make_shared<std::promise<uint>>());
 			auto future5 = pm->get_future();
 			std::thread([spm = pm]
 			{
@@ -216,11 +216,11 @@ int main()
 			}).detach();
 
 			dlog() << "(iteration " << i << ") Multiple futures:"
-				   << "\n\tfuture1: " << future1
-				   << "\n\tfuture2: " << future2
-				   << "\n\tfuture3: " << future3
-				   << "\n\tfuture4: " << future4
-				   << "\n\tfuture5: " << future5;
+				   << "\n\tfuture 1: " << future1
+				   << "\n\tfuture 2: " << future2
+				   << "\n\tfuture 3: " << future3
+				   << "\n\tfuture 4: " << future4
+				   << "\n\tfuture 5: " << future5;
 		}
 	}
 

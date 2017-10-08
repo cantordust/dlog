@@ -6,8 +6,9 @@ find_package(Threads REQUIRED)
 
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
+set(CMAKE_BUILD_TYPE Debug CACHE STRING "Build type" FORCE)
 set(bin_name "dlog")
+set(tp_debug ON CACHE BOOL "Threadpool debug output" FORCE)
 
 set(
 	CMAKE_RUNTIME_OUTPUT_DIRECTORY
@@ -16,6 +17,10 @@ set(
 	PATH
 	"Executable output directory"
 )
+
+if(${tp_debug})
+	add_definitions(-DTP_DEBUG)
+endif()
 
 set(
 	CMAKE_CXX_COMPILER
@@ -32,6 +37,7 @@ include_directories(
 
 set(
 	src_list
+	include/threadpool.hpp
 	include/dlog.hpp
 	src/example.cpp
 	)
