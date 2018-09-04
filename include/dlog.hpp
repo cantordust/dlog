@@ -8,6 +8,7 @@
 #include <future>
 #include <queue>
 #include <mutex>
+#include <iomanip>
 
 #include "threadpool.hpp"
 
@@ -46,7 +47,7 @@ namespace Async
 	public:
 
 		/// Version string.
-		inline static const std::string version{"0.2.2"};
+		inline static const std::string version{"0.2.3"};
 
 	private:
 
@@ -135,9 +136,87 @@ namespace Async
 
 		friend dlog& operator << (dlog& _dlog, std::ostream& (*_fp)(std::ostream&))
 		{
-			_dlog.gobble(_fp);
+			if (_dlog.out)
+			{
+				_dlog.buffer << _fp;
+			}
 			return _dlog;
 		}
+
+		///=====================================
+		/// Other convenience functions.
+		///=====================================
+
+		template<typename T>
+		dlog& add(T&& _t)
+		{
+			if (out)
+			{
+				buffer << std::forward<T>(_t);
+			}
+			return *this;
+		}
+
+		template<typename T>
+		dlog& operator + (T&& _t)
+		{
+			add(std::forward<T>(_t));
+			return *this;
+		}
+
+		template<typename T>
+		dlog& format(T&& _t, const uint _width)
+		{
+			if (out)
+			{
+				buffer << std::setw(_width) << std::forward<T>(_t);
+			}
+			return *this;
+		}
+
+		///=====================================
+		/// Output formatting
+		///=====================================
+
+		inline dlog& left()
+		{
+			if (out)
+			{
+				buffer << std::left;
+			}
+			return *this;
+		}
+
+		inline dlog& internal()
+		{
+			if (out)
+			{
+				buffer << std::internal;
+			}
+			return *this;
+		}
+
+		inline dlog& right()
+		{
+			if (out)
+			{
+				buffer << std::right;
+			}
+			return *this;
+		}
+
+		inline dlog& setfill(const char _ch = ' ')
+		{
+			if (out)
+			{
+				buffer << std::setfill(_ch);
+			}
+			return *this;
+		}
+
+		///=====================================
+		/// Static functions.
+		///=====================================
 
 		static void set_log_level(const uint _level)
 		{

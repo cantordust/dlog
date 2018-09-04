@@ -3,7 +3,6 @@
 #include <chrono>
 #include <random>
 #include <fstream>
-#include <iomanip>
 #include <ctime>
 #include "dlog.hpp"
 
@@ -24,7 +23,7 @@ std::string time()
 ///=============================================================================
 
 static std::mt19937_64 rng;
-static std::uniform_int_distribution<uint> sleep_dist(100, 2000);
+static std::uniform_int_distribution<uint> sleep_dist(100, 300);
 static std::uniform_int_distribution<uint> level_dist(1, 4);
 static std::uniform_int_distribution<uint> action_dist(0, 3);
 
@@ -134,7 +133,7 @@ struct Test
 
 	friend std::ostream& operator << (std::ostream& _os, const Test& _test)
 	{
-		return _os << "Test id: " << _test.id;
+		return _os << "Test id: " + std::to_string(_test.id);
 	}
 };
 
@@ -156,16 +155,26 @@ int main()
 	bool log_file_exists(false);
 	std::string log_file_name("test.log");
 
+	///=====================================
+	/// Formatting options
+	///=====================================
+
+	Test t;
+	dlog d("Formatting test:\n");
+	d.left().setfill(' ');
+	d.format(t, 20) + "|\n";
+	d.format("Another string", 20) + "|" << std::endl;
+
+	///=====================================
+	/// Multi-threaded output
+	///=====================================
+
 	// Declare streams as static to prevent
 	// them from disappearing when main() exits
 	static std::ofstream log_file(log_file_name, std::ios::out | (log_file_exists ? std::ios::app : std::ios::trunc));
 	log_file_exists = true;
 
 	uint worker(0);
-
-	Test t;
-	dlog d("Printing test");
-	d << t;
 
 	// Output a header to the log file
 	dlog(log_file, "###", time(), ": start of log in thread", std::this_thread::get_id(), "###");
