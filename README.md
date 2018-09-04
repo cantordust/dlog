@@ -12,25 +12,36 @@ However, there is the added problem that unsynchronised threads can access outpu
 
 You can use dlog to direct output to streams like you do with any other stream (such as `std::cout` or a `std::ofstream`). It is nothing but a thin veil over your stream that wraps an output operation and ensures that it is done atomically, thus preventing interleaved output. It also has the added benefit of revealing the *actual* order of events occurring in multiple threads rather than what can be (often wrongly) inferred from looking at the source code.
 
-You can use dlog like you use any other stream, such as `std::cout` (the default output stream), just add parentheses `()` after `dlog`:
+You can use dlog in two ways. There are several convenient constructors that allow dlog to be used as a "one-liner":
 
 ```c++
-dlog() << "This is output as a single atomic operation.\n"
-	   << "It will not be interleaved with output from other threads.\n";
+dlog("This is output as a single atomic operation.\n", "It will not be interleaved with output from other threads.\n");
 ```
+Essentially, this creates a temporary object that lives just long enough to print whatever is passed to the constructor.
 
-dlog is also capable of printing any `std::future` produced by `std::async`, `std::promise` or `std::packaged_task`. To print a future asynchronously, just make sure that you don't call your future's `get()` method when printing it, otherwise it will block.
+The other option is to create a named object and print to it using `operator <<`.
 
 ```c++
-std::future f(std::async(std::launch::async, my_function));
-dlog() << "Future: " << f; // *Not* f.get()
-```
 
-dlog will execute the task and will print the output when it is finished. After you have debugged your program, you can comment out dlog entries and call the `get()` method as usual.
+dlog d(">> Dlog instantiated.");
+
+// Code...
+
+d << "This will be printed in a single atomic operation.\n";
+
+// More code ...
+
+d << "It will not be interleaved with output from other threads.\n";
+```
+The entire sequence will be printed nicely without interference from other threads when the `dlog` object is destroyed.
+
+## Linking
+
+`dlog` is a header-only library, so no linking required - just download the header and `#include` it in your project. Note that it depends on the threadpool library (included). The two will be merged into a larger project in the near future. 
 
 ## Usage
 
-dlog is a header-only library, which means that you don't have to link against it - just download the header and `#include` it in your project. An example covering its usage is provided under `src`. To run the example, do the following (assuming that the sources are located under the directory `dlog` in your home directory):
+An example is provided under `src`. To run the example, do the following (assuming that the sources are located under the directory `dlog` in your home directory):
 
 ```bash
 $ cd ~/dlog
