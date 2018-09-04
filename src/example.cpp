@@ -7,206 +7,211 @@
 #include <ctime>
 #include "dlog.hpp"
 
+///=============================================================================
+///	Current time.
+///=============================================================================
+
+std::string time()
+{
+	std::stringstream tm;
+	std::time_t cur_time(std::time(nullptr));
+	tm << std::put_time(std::localtime(&cur_time), "%c %Z");
+	return tm.str();
+}
+
+///=============================================================================
+///	Random number generator and number distributions.
+///=============================================================================
+
 static std::mt19937_64 rng;
-static std::uniform_int_distribution<uint> d_sleep(100, 300);
-static std::uniform_int_distribution<uint> d_actions(0, 4);
+static std::uniform_int_distribution<uint> sleep_dist(100, 2000);
+static std::uniform_int_distribution<uint> level_dist(1, 4);
+static std::uniform_int_distribution<uint> action_dist(0, 3);
 
 using namespace Async;
 
-AffixSet gen(const uint _log_level)
+///=============================================================================
+///	Log levels, affix set generator and log level die.
+///=============================================================================
+
+enum class LogLevel : uint
 {
-	switch (_log_level)
+	Log = 0,
+	Info,
+	Warn,
+	Error,
+	Critical
+};
+
+AffixSet afx(const LogLevel _level)
+{
+	switch (_level)
 	{
-	case 0: return {0, "(0) [Log     ] ", " - "};
-	case 1: return {1, "(1) [Info    ] ", " / "};
-	case 2: return {2, "(2) [Warn    ] ", " | "};
-	case 3: return {3, "(3) [Error   ] ", " \\ "};
-	case 4: return {4, "(4) [Critical] ", " - "};
-	default: return AffixSet();
+	case LogLevel::Log:
+		return {0, "(0) [Log     ][" + time() + "] ", " - "};
+
+	case LogLevel::Info:
+		return {1, "(1) [Info    ][" + time() + "] ", " / "};
+
+	case LogLevel::Warn:
+		return {2, "(2) [Warn    ][" + time() + "] ", " | "};
+
+	case LogLevel::Error:
+		return {3, "(3) [Error   ][" + time() + "] ", " \\ "};
+
+	case LogLevel::Critical:
+		return {4, "(4) [Critical][" + time() + "] ", " - "};
+
+	default:
+		return AffixSet();
 	}
 }
 
-//std::string time()
-//{
-//	std::stringstream tm;
-//	std::time_t cur_time(std::time(nullptr));
-//	tm << std::put_time(std::localtime(&cur_time), "%c %Z");
-//	return tm.str();
-//}
+LogLevel rnd_level()
+{
+	return static_cast<LogLevel>(level_dist(rng));
+}
 
-//uint uint_void()
-//{
-//	uint sleep(d_sleep(rng));
-//	dlog() << "\tuint_void sleeping for " << sleep << " ms";
-//	std::this_thread::sleep_for(std::chrono::milliseconds(sleep));
-//	dlog() << "\tuint_void slept for " << sleep << " ms";
-//	return sleep;
-//}
+///=============================================================================
+///	Global variables.
+///=============================================================================
 
-//void void_uint(const uint _val)
-//{
-//	dlog() << "\tvoid_uint sleeping for " << _val << " ms";
-//	std::this_thread::sleep_for(std::chrono::milliseconds(_val));
-//	dlog() << "\tvoid_uint slept for " << _val << " ms";
-//}
+/// Default log level.
+/// No output will be produced if the log level supplied to
+/// the log() functions above is lower than this.
+LogLevel log_level(LogLevel::Error);
+
+/// Number of threads in the threadpool.
+uint threads(3);
+
+/// Number of records to generate.
+uint records(100);
+
+///=============================================================================
+///	Test functions.
+/// @todo: More functions.
+///=============================================================================
+
+template<LogLevel level = LogLevel::Log>
+uint uint_void()
+{
+	uint sleep(sleep_dist(rng));
+	dlog("\tuint_void sleeping for", sleep, "ms");
+	std::this_thread::sleep_for(std::chrono::milliseconds(sleep));
+	dlog("\tuint_void slept for", sleep, "ms");
+	return sleep;
+}
+
+template<LogLevel level = LogLevel::Log>
+void void_uint(const uint _val)
+{
+	dlog("\tvoid_uint sleeping for", _val, "ms");
+	std::this_thread::sleep_for(std::chrono::milliseconds(_val));
+	dlog("\tvoid_uint slept for", _val, "ms");
+}
+
+void act()
+{
+	static std::atomic<uint> rock(0);
+	switch (action_dist(rng))
+	{
+	case 0:
+		uint_void();
+		break;
+
+	case 1:
+		void_uint(sleep_dist(rng));
+		break;
+
+	default:
+		std::async(std::launch::async, [&]{ dlog("#### Lambdas rock", ++rock, "times!"); });
+	}
+}
+
+struct Test
+{
+	uint id = level_dist(rng);
+
+	friend std::ostream& operator << (std::ostream& _os, const Test& _test)
+	{
+		return _os << "Test id: " << _test.id;
+	}
+};
+
+///=============================================================================
+///	Main event
+///=============================================================================
 
 int main()
 {
 	rng.seed(static_cast<uint>(std::chrono::high_resolution_clock().now().time_since_epoch().count()));
 
-	dlog::log_level = 0;
+	/// Set the log level.
+	dlog::set_log_level(static_cast<uint>(log_level));
 
-	//	// Set the minimal log level
-	//	dlog::set_default_log_level(3);
+	/// Set the number of threads for the threadpool.
+	dlog::set_threads(threads);
 
-	//	uint threads(5);
-	//	bool log_file_exists(false);
-	//	std::string log_file_name("test.log");
+	/// Log file
+	bool log_file_exists(false);
+	std::string log_file_name("test.log");
 
-	//	// Declare streams as static to prevent
-	//	// them from disappearing when main() exits
-	//	static std::ofstream log_file(log_file_name, std::ios::out | (log_file_exists ? std::ios::app : std::ios::trunc));
-	//	log_file_exists = true;
+	// Declare streams as static to prevent
+	// them from disappearing when main() exits
+	static std::ofstream log_file(log_file_name, std::ios::out | (log_file_exists ? std::ios::app : std::ios::trunc));
+	log_file_exists = true;
 
-	//	uint worker(0);
+	uint worker(0);
 
-	//	// Output a header to the log file, all parameters set
-	//	dlog(0, log_file, "### ", " ", " ###\n") << "Log started on " << time()
-	//											 << " in thread " << std::this_thread::get_id();
+	Test t;
+	dlog d("Printing test");
+	d << t;
 
-	//	std::vector<std::thread> workers;
-	//	for (uint i = 0; i < threads; ++i)
-	//	{
-	//		workers.emplace_back([&]
-	//		{
-	//			// Worker ID and log level
-	//			uint w(++worker);
+	// Output a header to the log file
+	dlog(log_file, "###", time(), ": start of log in thread", std::this_thread::get_id(), "###");
 
-	//			// Output to std::cout only above a certain log level
-	//			dlog(w) << "--> Worker " << w << " created in thread "
-	//					<< std::this_thread::get_id();
-
-	//			while(true)
-	//			{
-	//				std::this_thread::sleep_for(std::chrono::milliseconds(d_sleep(rng)));
-
-	//				// Output to a file
-	//				dlog(w, log_file) << "(" << time() << ")\t"
-	//								  << " Message from worker " << w << " in thread "
-	//								  << std::this_thread::get_id();
-	//				uint action(d_actions(rng));
-	//				if (action == 0)
-	//				{
-	//					// Always output if log level is not specified
-	//					dlog() << "--> Worker " << w << " in thread "
-	//						   << std::this_thread::get_id() << " exiting";
-	//					break;
-	//				}
-	//				else if (action % 2 == 0)
-	//				{
-	//					// It is possible to print futures without blocking
-	//					// by passing the future rather than future.get()
-	//					auto future = std::async(std::launch::async, uint_void);
-	//					dlog() << "Future value from uint_void: " << future;
-	//				}
-	//				else if (action % 3 == 0)
-	//				{
-	//					// Void futures can also be handled
-	//					auto future = std::async(std::launch::async, void_uint, d_sleep(rng));
-	//					dlog() << "Future returned from void_uint" << future;
-	//				}
-	//				else
-	//				{
-	//					// Multiple futures can be printed together
-	//					auto future1 = std::async(std::launch::async, uint_void);
-	//					auto future2 = std::async(std::launch::async, uint_void);
-	//					auto future3 = std::async(std::launch::async, uint_void);
-
-	//					dlog() << "Multiple futures:"
-	//						   << "\n\tfuture 1: " << future1
-	//						   << "\n\tfuture 2: " << future2
-	//						   << "\n\tfuture 3: " << future3;
-	//				}
-	//			}
-	//		});
-	//	}
-
-	//	for (auto& worker : workers)
-	//	{
-	//		worker.join();
-	//	}
-
-	//	// Output a footer to the log file, all parameters set
-	//	dlog(0, log_file, "\n### ", " ", " ###") << "Log ended on " << time();
-
-	//	dlog() << "*** Calling dlog() from main() ***";
-
-	//	// We can also call dlog from the main thread
-	//	uint rock(0);
-	//	for (uint i = 1; i <= 30; ++i)
-	//	{
-	//		uint action(d_actions(rng));
-	//		if (action % 2 == 0)
-	//		{
-	//			dlog() << "iteration " << i << ": action 1";
-	//			// It is possible to print futures without blocking
-	//			// by passing the future rather than future.get()
-	//			auto future = std::async(std::launch::async, uint_void);
-	//			dlog() << "(iteration " << i << ") Future value from uint_void: " << future;
-	//		}
-	//		else if (action % 3 == 0)
-	//		{
-	//			dlog() << "iteration " << i << ": action 2";
-	//			// Void futures can also be handled
-	//			auto future = std::async(std::launch::async, void_uint, d_sleep(rng));
-	//			dlog() << "(iteration " << i << ") Future returned from void_uint" << future;
-	//		}
-	//		else
-	//		{
-	//			dlog() << "iteration " << i << ": action 3";
-
-	//			// Multiple futures can be printed together
-	//			auto future1 = std::async(std::launch::async, uint_void);
-
-	//			auto future2 = std::async(std::launch::async, void_uint, d_sleep(rng));
-
-	//			auto future3 = std::async(std::launch::async, [&]{ dlog() << "#### Lambdas rock " << ++rock << " times!"; });
-
-	//			sp<std::packaged_task<uint()>> pt(std::make_shared<std::packaged_task<uint()>>(uint_void));
-	//			auto future4 = pt->get_future();
-	//			std::thread([spt = pt]
-	//			{
-	//				std::this_thread::sleep_for(std::chrono::milliseconds(5000));
-	//				(*spt)();
-	//			}).detach();
-
-	//			sp<std::promise<uint>> pm(std::make_shared<std::promise<uint>>());
-	//			auto future5 = pm->get_future();
-	//			std::thread([spm = pm]
-	//			{
-	//				std::this_thread::sleep_for(std::chrono::milliseconds(10000));
-	//				spm->set_value(uint_void());
-	//			}).detach();
-
-	//			dlog() << "(iteration " << i << ") Multiple futures:"
-	//				   << "\n\tfuture 1: " << future1
-	//				   << "\n\tfuture 2: " << future2
-	//				   << "\n\tfuture 3: " << future3
-	//				   << "\n\tfuture 4: " << future4
-	//				   << "\n\tfuture 5: " << future5;
-	//		}
-	//	}
-
-	//	dlog() << "*** Exiting main...";
-
-	//	log("This is a test", "and another test");
-	for (uint it = 0; it < 500; ++it)
+	std::vector<std::thread> workers;
+	for (uint i = 0; i < threads; ++i)
 	{
-		log(std::cerr, gen(d_actions(rng)), "This", "is", "a", "test");
-//		std::this_thread::sleep_for(std::chrono::milliseconds(d_sleep(rng)));
+		workers.emplace_back([&]
+		{
+			// Worker ID and log level
+			uint w(++worker);
+
+			// Output to std::cout only above a certain log level
+			dlog(">>> Worker", w, "created in thread", std::this_thread::get_id());
+
+			for (uint r = 0; r < records; ++r)
+			{
+				std::this_thread::sleep_for(std::chrono::milliseconds(sleep_dist(rng)));
+
+				/// Output to std::cout.
+				dlog(afx(rnd_level()), "\tMessage from worker", w, "in thread", std::this_thread::get_id());
+
+				// Output to a file.
+				dlog(log_file, afx(rnd_level()), "\tMessage from worker", w, "in thread", std::this_thread::get_id());
+			}
+		});
 	}
 
-	//	std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+	for (auto& worker : workers)
+	{
+		worker.join();
+	}
+
+	// Output a footer to the log file, all parameters set
+	dlog(log_file, "\n###",  time(), ": end of log ###");
+
+	dlog("*** Calling dlog from main() ***");
+
+	// We can also call dlog from the main thread
+	for (uint r = 1; r <= records; ++r)
+	{
+		dlog("Record", r);
+		act();
+	}
+
+	dlog("*** Exiting main...");
 
 	return 0;
 }

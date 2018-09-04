@@ -46,15 +46,15 @@ namespace Async
 	public:
 
 		/// Version string.
-		inline static const std::string version{"0.2.1"};
-
-		/// Default log level.
-		inline static uint log_level{0};
+		inline static const std::string version{"0.2.2"};
 
 	private:
 
 		/// Threadpool for multi-threaded output.
-		inline static ThreadPool tp{std::thread::hardware_concurrency()};
+		inline static ThreadPool tp;
+
+		/// Default log level.
+		inline static uint log_level{0};
 
 		/// Mutex for accessing the print queue.
 		inline static std::mutex semaphore_mutex;
@@ -68,10 +68,10 @@ namespace Async
 		/// Strings appended to the input.
 		/// If not set in the constructor, these
 		/// are given the default values.
-		AffixSet afs;
+		AffixSet afx;
 
 		/// Stream associated with this log.
-		std::ostream& stream;
+		std::ostream& stream{std::cout};
 
 		/// Buffer for storing the output.
 		std::stringstream buffer;
@@ -79,82 +79,70 @@ namespace Async
 	public:
 
 		template<typename ... Args>
-		dlog(std::ostream& _stream,
-			 AffixSet _afs,
-			 Args&& ... _args)
+		dlog(std::ostream& _stream, AffixSet _afx, Args&& ... _args)
 			:
-			  out(_afs.log_level == 0 || _afs.log_level >= log_level),
-			  afs(_afs),
+			  out(_afx.log_level == 0 || _afx.log_level >= log_level),
+			  afx(_afx),
 			  stream(_stream)
 		{
-			if (out)
-			{
-				buffer << afs.prefix;
-				gobble(std::forward<Args>(_args)...);
-			}
+			init(std::forward<Args>(_args)...);
+		}
+
+		template<typename ... Args>
+		dlog(std::ostream& _stream, Args&& ... _args)
+			:
+			  stream(_stream)
+		{
+			init(std::forward<Args>(_args)...);
+		}
+
+		template<typename ... Args>
+		dlog(std::ofstream& _stream, Args&& ... _args)
+			:
+			  dlog(static_cast<std::ostream&>(_stream), std::forward<Args>(_args)...)
+		{}
+
+		template<typename ... Args>
+		dlog(AffixSet _afx, Args&& ... _args)
+			:
+			  out(_afx.log_level == 0 || _afx.log_level >= log_level),
+			  afx(_afx)
+		{
+			init(std::forward<Args>(_args)...);
+		}
+
+		template<typename ... Args>
+		dlog(Args&& ... _args)
+		{
+			init(std::forward<Args>(_args)...);
 		}
 
 		~dlog()
 		{
 			if (out)
 			{
-				buffer << afs.suffix;
+				buffer << afx.suffix;
 				flush(stream, buffer.str());
 			}
 		}
 
-//		template<typename T>
-//		dlog& operator << (const T& _t)
-//		{
-//			if (out)
-//			{
-//				std::stringstream ss;
-//				ss << _t;
-//				auto task(std::make_shared<ptask>([buf = buffer, inf = infix, tp = std::make_shared<std::string>(ss.str())]
-//				{
-//					*buf << *inf << *tp;
-//				}
-//				));
-//				print_queue.emplace([=]{ (*task)(); });
-//			}
-//			return *this;
-//		}
+		template<typename T>
+		friend dlog& operator << (dlog& _dlog, T&& _t)
+		{
+			_dlog.gobble(std::forward<T>(_t));
+			return _dlog;
+		}
 
-//		dlog& operator << (std::ostream& (*_fp)(std::ostream&))
-//		{
-//			if (out)
-//			{
-//				auto task(std::make_shared<ptask>([buf = buffer, inf = infix, fp = _fp]
-//				{
-//					*buf << *inf << fp;
-//				}
-//				));
-//				print_queue.emplace([=]{ (*task)(); });
-//			}
-//			return *this;
-//		}
+		friend dlog& operator << (dlog& _dlog, std::ostream& (*_fp)(std::ostream&))
+		{
+			_dlog.gobble(_fp);
+			return _dlog;
+		}
 
-//		template<typename T, typename std::enable_if<!std::is_void<T>::value, int>::type = 0>
-//		dlog& operator << (std::future<T>& _future)
-//		{
-//			if (out)
-//			{
-//				sp<std::future<T>> future(std::make_shared<std::future<T>>(std::move(_future)));
-//				auto task(std::make_shared<ptask>([buf = buffer, inf = infix, f = future]
-//				{
-//					*buf << *inf << f->get();
-//				}
-//				));
-//				print_queue.emplace([=]{ (*task)(); });
-//			}
-//			return *this;
-//		}
-
-//		template<typename T, typename std::enable_if<std::is_void<T>::value, int>::type = 0>
-//		dlog& operator << (std::future<T>& _future)
-//		{
-//			return *this;
-//		}
+		static void set_log_level(const uint _level)
+		{
+			log_level = _level;
+		}
 
 		static void set_threads(const uint _count)
 		{
@@ -163,11 +151,23 @@ namespace Async
 
 	private:
 
-		template<typename Param, typename ... Params>
-		void gobble(Param&& _param, Params&& ... _params)
+		template<typename Arg, typename ... Args>
+		void init(Arg&& _arg, Args&& ... _args)
 		{
-			buffer << std::forward<Param>(_param);
-			std::array<int, sizeof...(_params)> status{(buffer << afs.infix << std::forward<Params>(_params), 0) ...};
+			if (out)
+			{
+				buffer << afx.prefix << std::forward<Arg>(_arg);
+				gobble(std::forward<Args>(_args)...);
+			}
+		}
+
+		template<typename ... Args>
+		void gobble(Args&& ... _args)
+		{
+			if (out)
+			{
+				std::array<int, sizeof...(_args)> status{(buffer << afx.infix << std::forward<Args>(_args), 0) ...};
+			}
 		}
 
 		static void flush(std::ostream& _stream, std::string&& _content)
@@ -191,24 +191,6 @@ namespace Async
 			}
 		}
 	};
-
-	template<typename Stream, typename ... Args>
-	inline void log(Stream& _stream, AffixSet _afs, Args&& ... _args)
-	{
-		dlog(_stream, _afs, std::forward<Args>(_args)...);
-	}
-
-	template<typename Stream, typename ... Args>
-	inline void log(Stream& _stream, Args&& ... _args)
-	{
-		dlog(_stream, AffixSet(), std::forward<Args>(_args)...);
-	}
-
-	template<typename ... Args>
-	inline void log(AffixSet _afs, Args&& ... _args)
-	{
-		dlog(std::cout, _afs, std::forward<Args>(_args)...);
-	}
 }
 
 #endif // DLOG_HPP
