@@ -79,8 +79,8 @@ namespace Async
 
 	public:
 
-		template<typename ... Args>
-		dlog(std::ostream& _stream, AffixSet _afx, Args&& ... _args)
+		template<typename Arg, typename ... Args>
+		dlog(std::ostream& _stream, AffixSet _afx, Arg&& _arg, Args&& ... _args)
 			:
 			  out(_afx.log_level == 0 || _afx.log_level >= log_level),
 			  afx(_afx),
@@ -229,6 +229,9 @@ namespace Async
 		}
 
 	private:
+
+		template<typename ... Args>
+		void init() {}
 
 		template<typename Arg, typename ... Args>
 		void init(Arg&& _arg, Args&& ... _args)
