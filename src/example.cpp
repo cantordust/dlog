@@ -23,7 +23,7 @@ std::string time()
 ///=============================================================================
 
 static std::mt19937_64 rng;
-static std::uniform_int_distribution<uint> sleep_dist(100, 300);
+static std::uniform_int_distribution<uint> sleep_dist(100, 1500);
 static std::uniform_int_distribution<uint> level_dist(1, 4);
 static std::uniform_int_distribution<uint> action_dist(0, 3);
 
@@ -148,9 +148,6 @@ int main()
 	/// Set the log level.
 	dlog::set_log_level(static_cast<uint>(log_level));
 
-	/// Set the number of threads for the threadpool.
-	dlog::set_threads(threads);
-
 	/// Log file
 	bool log_file_exists(false);
 	std::string log_file_name("test.log");
@@ -159,11 +156,13 @@ int main()
 	/// Formatting options
 	///=====================================
 
-	Test t;
-	dlog d("Formatting test:\n");
-	d.left().setfill(' ');
-	d.format(t, 20) + "|\n";
-	d.format("Another string", 20) + "|" << std::endl;
+	{
+		Test t;
+		dlog d("Formatting test:\n");
+		d.left().setfill(' ');
+		d.format(t, 20) + "|\n";
+		d.format("Another string", 20) + "|" << std::endl;
+	}
 
 	///=====================================
 	/// Multi-threaded output
@@ -171,7 +170,7 @@ int main()
 
 	// Declare streams as static to prevent
 	// them from disappearing when main() exits
-	static std::ofstream log_file(log_file_name, std::ios::out | (log_file_exists ? std::ios::app : std::ios::trunc));
+	std::shared_ptr<std::ofstream> log_file(std::make_shared<std::ofstream>(log_file_name, std::ios::out | (log_file_exists ? std::ios::app : std::ios::trunc)));
 	log_file_exists = true;
 
 	uint worker(0);

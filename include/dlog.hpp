@@ -9,13 +9,14 @@
 #include <queue>
 #include <mutex>
 #include <iomanip>
-
-#include "threadpool.hpp"
+#include <unordered_map>
 
 namespace Async
 {
 	template<typename T1, typename T2>
 	using hmap = std::unordered_map<T1, T2>;
+
+	using glock = std::lock_guard<std::mutex>;
 
 	/// Set of strings affixed to the input
 	/// at various positions.
@@ -47,17 +48,14 @@ namespace Async
 	public:
 
 		/// Version string.
-		inline static const std::string version{"0.2.3"};
+		inline static const std::string version{"0.2.4"};
 
 	private:
-
-		/// Threadpool for multi-threaded output.
-		inline static ThreadPool tp;
 
 		/// Default log level.
 		inline static uint log_level{0};
 
-		/// Mutex for accessing the print queue.
+		/// Master mutex for accessing the semaphores.
 		inline static std::mutex semaphore_mutex;
 
 		/// Pointers to output streams and
@@ -70,6 +68,8 @@ namespace Async
 		/// If not set in the constructor, these
 		/// are given the default values.
 		AffixSet afx;
+
+		std::shared_ptr<std::ostream> ofs{nullptr};
 
 		/// Stream associated with this log.
 		std::ostream& stream{std::cout};
@@ -90,18 +90,20 @@ namespace Async
 		}
 
 		template<typename ... Args>
+		dlog(std::shared_ptr<std::ofstream> _stream, Args&& ... _args)
+			:
+			  dlog(static_cast<std::ostream&>(*_stream), std::forward<Args>(_args)...)
+		{
+			ofs = _stream;
+		}
+
+		template<typename ... Args>
 		dlog(std::ostream& _stream, Args&& ... _args)
 			:
 			  stream(_stream)
 		{
 			init(std::forward<Args>(_args)...);
 		}
-
-		template<typename ... Args>
-		dlog(std::ofstream& _stream, Args&& ... _args)
-			:
-			  dlog(static_cast<std::ostream&>(_stream), std::forward<Args>(_args)...)
-		{}
 
 		template<typename ... Args>
 		dlog(AffixSet _afx, Args&& ... _args)
@@ -223,12 +225,15 @@ namespace Async
 			log_level = _level;
 		}
 
-		static void set_threads(const uint _count)
-		{
-			tp.resize(_count);
-		}
-
 	private:
+
+		static void spawn_printer()
+		{
+			std::thread([&]()
+			{
+
+			});
+		}
 
 		template<typename ... Args>
 		void init() {}
@@ -252,24 +257,21 @@ namespace Async
 			}
 		}
 
-		static void flush(std::ostream& _stream, std::string&& _content)
+		static void flush(std::ostream& _stream, const std::string& _content)
 		{
 			if (_content.size() > 0)
 			{
-				tp.enqueue([&, content = std::move(_content)]
+				glock lock(semaphore_mutex);
+				std::ostream* os(std::addressof(_stream));
+				if (os)
 				{
-					glock lock(semaphore_mutex);
-					std::ostream* os(std::addressof(_stream));
-					if (os)
-					{
-						glock lk(semaphores[os]);
-						*os << content;
-					}
-					else
-					{
-						semaphores.erase(os);
-					}
-				});
+					glock lk(semaphores[os]);
+					*os << _content;
+				}
+				else
+				{
+					semaphores.erase(os);
+				}
 			}
 		}
 	};
